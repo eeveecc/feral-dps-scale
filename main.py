@@ -20,7 +20,7 @@ class_colors = {
     "毁灭术": (128/255, 0/255, 128/255),
     "元素萨": (0/255, 0/255, 139/255),
     "增强萨": (0/255, 0/255, 139/255),
-    "猫德(实战)": (255/255, 165/255, 0/255),
+    "猫德": (255/255, 165/255, 0/255),
     "火法": (173/255, 216/255, 230/255),
     "冰迪凯": (139/255, 0/255, 0/255),
     "冰法": (173/255, 216/255, 230/255),
@@ -29,8 +29,7 @@ class_colors = {
     "惩戒骑": (255/255, 192/255, 203/255),
     "暗牧": (128/255, 128/255, 128/255),
     "生存猎": (0/255, 128/255, 0/255),
-    "邪迪凯": (139/255, 0/255, 0/255),
-    "猫德(模拟)": (255/255, 165/255, 0/255),
+    "邪迪凯": (139/255, 0/255, 0/255)
 }
 
 
@@ -43,27 +42,33 @@ def read_excel_data(file_path):
         data[class_name] = np.array([item_levels, dps_values])
     return data
 
-data = read_excel_data('./cat_vs_s_tier.xlsx')
+target_data = "cat_vs_melee"
+data = read_excel_data('./' + target_data + '.xlsx')
 
 # Prediction function (Modify this according to the actual prediction model)
+from sklearn.linear_model import LinearRegression
+
 def predict_dps(item_levels, class_data):
-    # Here, we use a simple linear regression for demonstration purposes
-    coefficients = np.polyfit(class_data[0], class_data[1], 1)
-    return np.polyval(coefficients, item_levels)
+    X = class_data[0].reshape(-1, 1)
+    y = class_data[1]
+    model = LinearRegression().fit(X, y)
+    predicted_dps = model.predict(item_levels.reshape(-1, 1))
+    return predicted_dps
 
 # Set up the plot
-fig, ax = plt.subplots(figsize=(12, 6))
+fig, ax = plt.subplots(figsize=(24, 10))
 fig.subplots_adjust(right=0.78)
-ax.set_title("猫德DPS成长曲线", fontsize=16, fontweight='bold')
-ax.set_xlabel("装备等级", fontsize=14)
-ax.set_ylabel("DPS", fontsize=14)
+ax.set_title("基于P1和P2数据的DPS成长曲线", fontsize=16, fontweight='bold', pad=40)
+ax.text(0.5, 1.05, "90-120秒战斗,基于P1帕奇维克和P2的托里姆", ha='center', va='bottom', transform=ax.transAxes, fontsize=10)
+ax.set_xlabel("装备等级", fontsize=14, labelpad=10)
+ax.set_ylabel("DPS", fontsize=14, labelpad=10)
 ax.set_xlim(200, 260)  # Adjust the x-axis range according to your data
-ax.set_ylim(5000, 13500)  # Adjust the y-axis range according to your data
+ax.set_ylim(5000, 16000)  # Adjust the y-axis range according to your data
 ax.grid(True)  # Enable grid
 
 
-lines = {class_name: ax.plot([], [], label=class_name, marker='o', markersize=8, color=class_colors[class_name])[0] for class_name in data}
-predictions = {class_name: ax.plot([], [], linestyle="--", linewidth=2, color=class_colors[class_name])[0] for class_name in data}
+lines = {class_name: ax.plot([], [], label=class_name, marker='o', markersize=4, color=class_colors[class_name])[0] for class_name in data}
+predictions = {class_name: ax.plot([], [], linestyle="--", linewidth=1, color=class_colors[class_name])[0] for class_name in data}
 
 ax.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), fancybox=True, ncol=1, fontsize=10) # Move legend to right
 
@@ -71,15 +76,24 @@ def update(frame):
     class_name = list(data.keys())[frame % len(data)]
     class_data = data[class_name]
 
-    # Update the original data plot
-    lines[class_name].set_data(class_data[0], class_data[1])
+    if frame <= len(data):
+        # Update the original data plot
+        lines[class_name].set_data(class_data[0], class_data[1])
 
-    # Update the prediction curve
-    extended_item_levels = np.linspace(50, 250, 100)  # Adjust the range according to your data
-    predicted_dps = predict_dps(extended_item_levels, class_data)
-    predictions[class_name].set_data(extended_item_levels, predicted_dps)
+    elif frame <= len(data)*2:  
+        # Update the prediction curve
+        extended_item_levels = np.linspace(200, 277, 2000)  # Adjust the range according to your data
+        predicted_dps = predict_dps(extended_item_levels, class_data)
+        predictions[class_name].set_data(extended_item_levels, predicted_dps)
+    
+    else:
+        ax.scatter([217, 241, 255, 274], [8011, 10353, 11759, 14582], marker='*', s=350, color='orange', label='Extra Points')
+        ax.annotate('P1模拟 - 8011', xy=(217, 8011), xytext=(212, 6070), fontsize=14, color='white', arrowprops=dict(arrowstyle="->", color='white'))
+        ax.annotate('P2模拟 - 10353', xy=(241, 10353), xytext=(234, 7353), fontsize=14, color='white', arrowprops=dict(arrowstyle="->", color='white'))
+        ax.annotate('P3模拟 - 11759', xy=(255, 11759), xytext=(252, 8759), fontsize=14, color='white', arrowprops=dict(arrowstyle="->", color='white'))
+        ax.annotate('P4模拟(TBD) - 14582', xy=(274, 14582), xytext=(265, 11582), fontsize=14, color='white', arrowprops=dict(arrowstyle="->", color='white'))
 
     return lines.values(), predictions.values()
 
-ani = FuncAnimation(fig, update, frames=len(data), interval=10000)
-ani.save('dps_animation.gif', writer='imagemagick', fps=1, dpi=150)
+ani = FuncAnimation(fig, update, frames=len(data)*2+15)
+ani.save(target_data + '.gif', writer='imagemagick', fps=1, dpi=150)
